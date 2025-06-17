@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Celerate Auto-Update Provider
  * Description: Provides auto-update capabilities to Celerate custom plugins.
- * Version: 1.0.0
+ * Version: 1.0.4
  * Author: Celerate
  * Author URI: https://www.gocelerate.com/
  * License: Proprietary

@@ -1,5 +1,4 @@
 <?php
-
 namespace Celerate\WordPress;
 
 final class AutoUpdateProvider
@@ -10,7 +9,7 @@ final class AutoUpdateProvider
 
     protected function __construct(string $pluginFilePath, string $baseUrl)
     {
-        $this->path = $pluginFilePath;
+        $this->path    = $pluginFilePath;
         $this->baseUrl = $baseUrl;
 
         add_filter('plugins_api', [$this, 'getPluginInfo'], 20, 3);
@@ -35,13 +34,13 @@ final class AutoUpdateProvider
 
     private function loadPluginData(): array
     {
-        if (!function_exists('get_plugin_data')) {
+        if (! function_exists('get_plugin_data')) {
             require_once ABSPATH . 'wp-admin/includes/plugin.php';
         }
 
-        $data = get_plugin_data($this->path);
+        $data              = get_plugin_data($this->path);
         $data['file_path'] = plugin_basename($this->path);
-        $data['slug'] = dirname($data['file_path']);
+        $data['slug']      = dirname($data['file_path']);
 
         return $data;
     }
@@ -77,19 +76,19 @@ final class AutoUpdateProvider
             $result->author         = $parsed->author;
             $result->author_profile = $parsed->author_profile;
             // The new version comes from the server response.
-            $result->new_version    = $parsed->version;
+            $result->new_version = $parsed->version;
             // The current/old version comes from the parsed plugin data.
-            $result->version        = $this->pluginData['Version'];
-            $result->tested         = $parsed->tested;
-            $result->requires       = $parsed->requires;
-            $result->requires_php   = $parsed->requires_php;
-            $result->download_link  = $parsed->download_url;
-            $result->trunk          = $parsed->download_url;
-            $result->package        = $parsed->download_url;
-            $result->last_updated   = $parsed->last_updated;
-            $result->sections       = (array) $parsed->sections;
+            $result->version       = $this->pluginData['Version'];
+            $result->tested        = $parsed->tested;
+            $result->requires      = $parsed->requires;
+            $result->requires_php  = $parsed->requires_php;
+            $result->download_link = $parsed->download_url;
+            $result->trunk         = $parsed->download_url;
+            $result->package       = $parsed->download_url;
+            $result->last_updated  = $parsed->last_updated;
+            $result->sections      = (array) $parsed->sections;
 
-            if (!empty($parsed->banners)) {
+            if (! empty($parsed->banners)) {
                 $result->banners = (array) $parsed->banners;
             }
 
@@ -123,18 +122,32 @@ final class AutoUpdateProvider
     {
         $this->lazyLoadPluginData();
 
-        if (!empty($transient->response[$this->pluginData['file_path']])) {
+        // Normalise
+        if (false === $transient || ! is_object($transient)) {
+            $transient = new \stdClass();
+        }
+        $transient->response ??= [];
+        $transient->no_update ??= [];
+
+        // Bail early if we already decided
+        if (isset($transient->response[$this->pluginData['file_path']])) {
             return $transient;
         }
 
+        // Fetch remote metadata (cached)
         $remote = $this->maybeFetchPluginData();
-
-        if ($remote === false || is_wp_error($remote)) {
-            return $transient;
+        if (false === $remote || is_wp_error($remote)) {
+            return $transient; // stay silent on network error
         }
 
-        if ($remote) {
+        // Version comparison
+        $installed = $this->pluginData['Version'];
+        $available = $remote->new_version;
+
+        if (version_compare($available, $installed, '>')) {
             $transient->response[$this->pluginData['file_path']] = $remote;
+        } else {
+            $transient->no_update[$this->pluginData['file_path']] = $remote;
         }
 
         return $transient;
