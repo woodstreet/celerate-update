@@ -24,6 +24,8 @@ final class AutoUpdateProvider
      */
     public static function register(string $pluginFilePath): self
     {
+        self::maybeCleanupLegacyTransient();
+
         return self::$instances[$pluginFilePath] ??= new self($pluginFilePath, 'https://gowpupdate.gocelerate.com');
     }
 
@@ -87,6 +89,8 @@ final class AutoUpdateProvider
             $result->package       = $parsed->download_url;
             $result->last_updated  = $parsed->last_updated;
             $result->sections      = (array) $parsed->sections;
+            $result->plugin = $this->pluginData['file_path'];
+
 
             if (! empty($parsed->banners)) {
                 $result->banners = (array) $parsed->banners;
@@ -151,5 +155,25 @@ final class AutoUpdateProvider
         }
 
         return $transient;
+    }
+
+    private static function maybeCleanupLegacyTransient(): void
+    {
+        // only run once per site
+        if (get_site_option('cau_cleaned_legacy_transient')) {
+            return;
+        }
+
+        $t = get_site_transient('update_plugins');
+
+        if ($t && isset($t->response) && is_array($t->response)) {
+            foreach ($t->response as $obj) {
+                if (is_object($obj) && ! isset($obj->plugin)) {
+                    delete_site_transient('update_plugins');
+                    update_site_option('cau_cleaned_legacy_transient', 1);
+                    break;
+                }
+            }
+        }
     }
 }
